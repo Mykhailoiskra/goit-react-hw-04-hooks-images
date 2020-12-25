@@ -1,98 +1,110 @@
+// Styles
 import "./App.css";
 import "react-toastify/dist/ReactToastify.css";
-import { Component } from "react";
+// Global components
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ToastContainer } from "react-toastify";
+
+// Local components
 import Searchbar from "./components/Searchbar";
 import ImageGallery from "./components/ImageGallery";
 import Modal from "./components/Modal";
 import API from "./services/pixabay-api";
 
+// Service variables
 const modalRoot = document.querySelector("#modal-root");
-export default class App extends Component {
-  state = {
-    query: "",
-    page: 1,
-    pictures: [],
-    error: null,
-    status: "idle",
-    showModal: false,
-    modalContent: {
-      url: "",
-      alt: "",
-    },
-  };
+const Status = {
+  IDLE: "idle",
+  PENDING: "pending",
+  RESOLVED: "resolved",
+  REJECTED: "rejected",
+};
 
-  componentDidUpdate(prevProps, prevState) {
-    const prevQuery = prevState.query;
-    const currentQuery = this.state.query;
+export default function App() {
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pictures, setPictures] = useState([]);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [status, setStatus] = useState(Status.IDLE);
+  const [modal, setModal] = useState(false);
+  const [largeImg, setLargeImg] = useState({
+    url: "",
+    alt: "",
+  });
 
-    if (prevQuery !== currentQuery) {
-      this.setState({ status: "pending" });
+  const isFirstRender = useRef(true);
 
-      this.fetchPictures();
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setStatus(Status.PENDING);
+    fetchPictures();
+  }, [query]);
+
+  useEffect(() => {
+    if (page === 1) {
+      return;
     }
 
-    if (prevState.page !== this.state.page) {
-      window.scrollTo({
-        top: document.documentElement.scrollHeight,
-        behavior: "smooth",
+    fetchPictures();
+  }, [page]);
+
+  const fetchPictures = () => {
+    API.fetchPictures(query, page)
+      .then((res) => {
+        setPictures((prevPictures) => [...prevPictures, ...res.hits]);
+        setStatus(Status.RESOLVED);
+        if (page !== 1) {
+          window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      })
+      .catch((error) => {
+        setErrorMsg(error);
+        setStatus(Status.REJECTED);
       });
-    }
-  }
-
-  fetchPictures = () => {
-    API.fetchPictures(this.state.query, this.state.page)
-      .then((res) =>
-        this.setState(({ pictures, page }) => ({
-          pictures: [...pictures, ...res.hits],
-          status: "resolved",
-          page: page + 1,
-        }))
-      )
-      .catch((error) => this.setState({ error, status: "rejected" }));
   };
 
-  handleSearchSubmit = (searchQuery) => {
-    this.setState({ query: searchQuery, page: 1, pictures: [] });
+  const handleSearchSubmit = (searchQuery) => {
+    setQuery(searchQuery);
+    setPage(1);
+    setPictures([]);
   };
 
-  handleImageClick = (imgSrc, alt) => {
-    this.setState({ modalContent: { url: imgSrc, alt } });
-    this.toggleModal();
+  const handleImageClick = (imgSrc, alt) => {
+    setLargeImg({ url: imgSrc, alt });
+    toggleModal();
   };
 
-  handleLoadMore = () => {
-    this.fetchPictures();
+  const toggleModal = () => {
+    setModal((modal) => !modal);
   };
 
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({ showModal: !showModal }));
+  const handleLoadMore = () => {
+    setPage((prevPage) => prevPage + 1);
   };
 
-  render() {
-    const { showModal, modalContent, pictures, status, error } = this.state;
-    return (
-      <div className="container">
-        <Searchbar onSubmit={this.handleSearchSubmit} />
-        <ImageGallery
-          pictures={pictures}
-          status={status}
-          error={error}
-          onClick={this.handleImageClick}
-          onLoadMore={this.handleLoadMore}
-        />
-        <ToastContainer autoClose={3000} />
-        {showModal &&
-          createPortal(
-            <Modal
-              src={modalContent.url}
-              alt={modalContent.alt}
-              onClose={this.toggleModal}
-            />,
-            modalRoot
-          )}
-      </div>
-    );
-  }
+  return (
+    <div className="container">
+      <Searchbar onSubmit={handleSearchSubmit} />
+      <ImageGallery
+        pictures={pictures}
+        status={status}
+        error={errorMsg}
+        onClick={handleImageClick}
+        onLoadMore={handleLoadMore}
+      />
+      <ToastContainer autoClose={3000} />
+      {modal &&
+        createPortal(
+          <Modal src={largeImg.url} alt={largeImg.alt} onClose={toggleModal} />,
+          modalRoot
+        )}
+    </div>
+  );
 }
