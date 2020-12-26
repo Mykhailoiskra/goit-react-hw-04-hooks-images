@@ -107,17 +107,24 @@ export default function ImageGallery({ onLoadMore, query, page }) {
   if (status === "resolved") {
     return (
       <>
-        <ul className="ImageGallery" onClick={handleImageClick}>
-          {pictures.map((picture) => (
-            <ImageGalleryItem
-              id={`${picture.id}`}
-              url={picture.webformatURL}
-              tags={picture.tags}
-              largeImgUrl={picture.largeImageURL}
-            />
-          ))}
-        </ul>
-        <Button onClick={onLoadMore} />
+        {pictures.length > 0 ? (
+          <>
+            <ul className="ImageGallery" onClick={handleImageClick}>
+              {pictures.map((picture) => (
+                <ImageGalleryItem
+                  id={`${picture.id}`}
+                  url={picture.webformatURL}
+                  tags={picture.tags}
+                  largeImgUrl={picture.largeImageURL}
+                />
+              ))}
+            </ul>
+            <Button onClick={onLoadMore} />
+          </>
+        ) : (
+          <div className="message">Nothing has been found</div>
+        )}
+
         {modal &&
           createPortal(
             <Modal
